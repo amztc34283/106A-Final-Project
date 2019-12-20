@@ -9,12 +9,14 @@
 import rospy
 import tf2_ros
 import sys
-from std_msgs.msg import String
 
 from geometry_msgs.msg import Twist
 
+trans_red = None
+trans_blue = None
+
 #Define the method which contains the main functionality of the node.
-def controller():
+def broadcaster():
   """
   Controls a turtlebot whose position is denoted by turtlebot_frame,
   to go to a position denoted by target_frame
@@ -26,65 +28,42 @@ def controller():
   ################################### YOUR CODE HERE ##############
 
   #Create a publisher and a tf buffer, which is primed with a tf listener
-  pub = rospy.Publisher('mobile_base/commands/velocity', Twist, queue_size=10)
-  pub7 = rospy.Publisher('notify_7bot', String, queue_size=10)
   tfBuffer = tf2_ros.Buffer()
   tfListener = tf2_ros.TransformListener(tfBuffer)
-
-  found_copy_blue = False
-  found_copy_red = False
+  br = tf2_ros.TransformBroadcaster()
   
   # Create a timer object that will sleep long enough to result in
   # a 10Hz publishing rate
   r = rospy.Rate(10) # 10hz
 
-  K1 = 0.3
-  K2 = 1
+  found_red = False
+  found_blue = False
+
+  global trans
+
+
   # Loop until the node is killed with Ctrl-C
   while not rospy.is_shutdown():
     try:
-      msg = ""
-      trans = None
-      # Find red first
-      if not found_copy_red:
-        trans = tfBuffer.lookup_transform("base_link", "copy_frame_red", rospy.Time())
-        msg = "red"
-      elif not found_copy_blue:
-        trans = tfBuffer.lookup_transform("base_link", "copy_frame_blue", rospy.Time())
-        msg = "blue"
-      # Process trans to get your state error
-      # Generate a control command to send to the robot
-
-      print(trans, msg)
-      
-      d2 = trans.transform.translation.x ** 2 + trans.transform.translation.y ** 2
-      print(d2)
-      if d2 < .05:
-        if msg is "red":
-          pub7.publish("red")
-        elif msg is "blue":
-          pub7.publish("blue")
-        print("brrrrrrr")
-        if not found_copy_red:
-          found_copy_red = True
-          continue
-        elif not found_copy_blue:
-          found_copy_blue = True
-          break
-
-
-      x = K1 * (trans.transform.translation.x)
-      theta = K2 * (trans.transform.translation.y)
-      t = Twist()
-      t.linear.x = x
-      t.angular.z = theta
-      control_command = t # Generate this
-
-      #################################### end your code ###############
-
-      pub.publish(control_command)
+      if not found_red or not found_blue:
+        # Add tf2 transform broadcaster
+        if not found_red:
+          trans_red = tfBuffer.lookup_transform("map", "object_1green_1", rospy.Time())
+          trans_red.child_frame_id = "copy_frame_red"
+          br.sendTransform(trans_red)
+          found_red = True
+        if not found_blue:
+          trans_blue = tfBuffer.lookup_transform("map", "object_1blue_1", rospy.Time())
+          trans_blue.child_frame_id = "copy_frame_blue"
+          br.sendTransform(trans_blue)
+          found_blue = True
+      else:
+        trans_red.header.stamp = rospy.Time.now()
+        trans_blue.header.stamp = rospy.Time.now()
+        br.sendTransform(trans_red)
+        br.sendTransform(trans_blue)
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-      pass
+      print(found_red, found_blue)
     # Use our rate object to sleep until it is time to publish again
     r.sleep()
 
@@ -97,9 +76,9 @@ if __name__ == '__main__':
 
   #Run this program as a new node in the ROS computation graph 
   #called /turtlebot_controller.
-  rospy.init_node('turtlebot_controller', anonymous=True)
+  rospy.init_node('broadcaster', anonymous=True)
 
   try:
-    controller()
+    broadcaster()
   except rospy.ROSInterruptException:
     pass
