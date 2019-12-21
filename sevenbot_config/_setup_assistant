@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: my_7bot
+    relative_path: urdf/sevenbot.urdf
+    xacro_args: "--inorder "
+  SRDF:
+    relative_path: config/sevenbot.srdf
+  CONFIG:
+    author_name: Connor Rathjen
+    author_email: connor.rathjen@berkeley.edu
+    generated_timestamp: 1575422966
